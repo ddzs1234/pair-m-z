@@ -7,7 +7,7 @@ np.seterr(divide='ignore', invalid='ignore')
 class stack(object):
     """
     stacking 0-1re
-    S/N>5
+    S/N>5 sigma
     """
     def __init__(self,plateifu,wave,flux,ivar,flux_map,ivar_map,mask,ellcoo,v,dirres,plot=True):
         self.plateifu=plateifu
@@ -64,6 +64,7 @@ class stack(object):
         count effective points
         """
         mask_1=(self.ellcoo<=1)
+        plt.figure()
         plt.subplot(1,2,1)
 #         plt.imshow(mask_1) 
         num_all=np.sum(mask_1)
@@ -126,23 +127,24 @@ class stack(object):
         """
         SNR
         """
-        snr=np.sum(self.flux_stack)/np.sqrt(np.sum(self.error_stack))
-        if snr>5:
+#         snr=np.sum(self.flux_stack)/np.sqrt(np.sum(self.error_stack))
+#         if snr>5:
             
-            print('plateifu',self.plateifu)
-            table=[self.wave]
-            table.append(self.flux_stack)
-            table.append(self.error_stack)
-            table=np.transpose(table)
-            t=Table(table,names=['wave','flux','error'])
-            t.write(self.dir+'%s_1re_stack.fits'%self.plateifu,format='fits')
-        else:
-            print('snr<5',self.plateifu)
+#             print('plateifu',self.plateifu)
+#             table=[self.wave]
+#             table.append(self.flux_stack)
+#             table.append(self.error_stack)
+#             table=np.transpose(table)
+#             t=Table(table,names=['wave','flux','error'])
+#             t.write(self.dir+'%s_1re_stack.fits'%self.plateifu,format='fits')
+#         else:
+#             print('snr<5',self.plateifu)
             
     def plot(self):
         """
         plot (wave,flux)
         """
+        
         plt.subplot(1,2,2)
         plt.plot(self.wave,self.flux_stack)
         plt.savefig(self.dir+'%s_1re_stack.jpg'%self.plateifu,format='jpg')
