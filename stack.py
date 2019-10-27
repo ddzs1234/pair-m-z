@@ -7,7 +7,7 @@ np.seterr(divide='ignore', invalid='ignore')
 class stack(object):
     """
     stacking 0-1re
-    S/N>5 sigma
+    S/N>5
     """
     def __init__(self,plateifu,wave,flux,ivar,flux_map,ivar_map,mask,ellcoo,v,dirres,plot=True):
         self.plateifu=plateifu
