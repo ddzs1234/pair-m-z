@@ -127,18 +127,18 @@ class stack(object):
         """
         SNR
         """
-#         snr=np.sum(self.flux_stack)/np.sqrt(np.sum(self.error_stack))
-#         if snr>5:
+        snr=np.sum(self.flux_stack)/np.sqrt(np.sum(self.error_stack))
+        if snr>5:
             
-#             print('plateifu',self.plateifu)
-#             table=[self.wave]
-#             table.append(self.flux_stack)
-#             table.append(self.error_stack)
-#             table=np.transpose(table)
-#             t=Table(table,names=['wave','flux','error'])
-#             t.write(self.dir+'%s_1re_stack.fits'%self.plateifu,format='fits')
-#         else:
-#             print('snr<5',self.plateifu)
+            print('plateifu',self.plateifu)
+            table=[self.wave]
+            table.append(self.flux_stack)
+            table.append(self.error_stack)
+            table=np.transpose(table)
+            t=Table(table,names=['wave','flux','error'])
+            t.write(self.dir+'%s_1re_stack.fits'%self.plateifu,format='fits')
+        else:
+            print('snr<5',self.plateifu)
             
     def plot(self):
         """
