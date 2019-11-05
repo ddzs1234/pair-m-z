@@ -2,12 +2,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np 
 from astropy.table import Table
+from scipy.interpolate import interp1d
 np.seterr(divide='ignore', invalid='ignore')
 
 class stack(object):
     """
     stacking 0-1re
     S/N>5 sigma
+    mask (5570-5590A)
     """
     def __init__(self,plateifu,wave,flux,ivar,flux_map,ivar_map,mask,ellcoo,v,dirres,plot=True):
         self.plateifu=plateifu
@@ -113,8 +115,19 @@ class stack(object):
             ivar=self.ivar[i]
             z=self.z[i]
             wave_rest=self.wave/(1+z)
-            flux=np.interp(self.wave,wave_rest,flux)
-            ivar=np.interp(self.wave,wave_rest,ivar)
+            """
+            5570-5590A
+            """
+#             mask_sky=(self.wave>5500)&(self.wave<6000)
+#             flux1=np.ma.array(flux,mask=mask_sky)
+#             ivar1=np.ma.array(ivar,mask=mask_sky)
+#             wave_rest=np.ma.array(wave_rest,mask=mask_sky)
+            mask_sky=(self.wave<5570)|(self.wave>5590)
+            flux1=np.array(flux[mask_sky])
+            ivar1=np.array(ivar[mask_sky])
+            wave_rest=np.array(wave_rest[mask_sky])
+            flux=np.interp(self.wave,wave_rest,flux1)
+            ivar=np.interp(self.wave,wave_rest,ivar1)
             # remove ivar==0:
             if flux.shape[0]>0:
                 # shape not size
@@ -127,18 +140,18 @@ class stack(object):
         """
         SNR
         """
-#         snr=np.sum(self.flux_stack)/np.sqrt(np.sum(self.error_stack))
-#         if snr>5:
+        snr=np.sum(self.flux_stack)/np.sqrt(np.sum(self.error_stack))
+        if snr>5:
             
-#             print('plateifu',self.plateifu)
-#             table=[self.wave]
-#             table.append(self.flux_stack)
-#             table.append(self.error_stack)
-#             table=np.transpose(table)
-#             t=Table(table,names=['wave','flux','error'])
-#             t.write(self.dir+'%s_1re_stack.fits'%self.plateifu,format='fits')
-#         else:
-#             print('snr<5',self.plateifu)
+            print('plateifu',self.plateifu)
+            table=[self.wave]
+            table.append(self.flux_stack)
+            table.append(self.error_stack)
+            table=np.transpose(table)
+            t=Table(table,names=['wave','flux','error'])
+            t.write(self.dir+'%s_1re_stack.fits'%self.plateifu,format='fits')
+        else:
+            print('snr<5',self.plateifu)
             
     def plot(self):
         """
