@@ -11,7 +11,7 @@ class stack(object):
     S/N>5 sigma
     mask (5570-5590A)
     """
-    def __init__(self,plateifu,wave,flux,ivar,flux_map,ivar_map,mask,ellcoo,v,dirres,plot=True):
+    def __init__(self,plateifu,wave,flux,ivar,flux_map,ivar_map,mask,ellcoo,v,dirres,plot=False):
         self.plateifu=plateifu
         self.flux = flux
         self.wave = wave
@@ -141,17 +141,17 @@ class stack(object):
         SNR
         """
         snr=np.sum(self.flux_stack)/np.sqrt(np.sum(self.error_stack))
-        if snr>5:
+#         if snr>5:
             
-            print('plateifu',self.plateifu)
-            table=[self.wave]
-            table.append(self.flux_stack)
-            table.append(self.error_stack)
-            table=np.transpose(table)
-            t=Table(table,names=['wave','flux','error'])
-            t.write(self.dir+'%s_1re_stack.fits'%self.plateifu,format='fits')
-        else:
-            print('snr<5',self.plateifu)
+#             print('plateifu',self.plateifu)
+#             table=[self.wave]
+#             table.append(self.flux_stack)
+#             table.append(self.error_stack)
+#             table=np.transpose(table)
+#             t=Table(table,names=['wave','flux','error'])
+#             t.write(self.dir+'%s_1re_stack.fits'%self.plateifu,format='fits')
+#         else:
+#             print('snr<5',self.plateifu)
             
     def plot(self):
         """
@@ -163,3 +163,45 @@ class stack(object):
         plt.savefig(self.dir+'%s_1re_stack.jpg'%self.plateifu,format='jpg')
 #         plt.show()
            
+    def min_snr_emission(self):
+        """
+        DO2: NII,Ha
+        KD02: OII,OIII,NII,Hb
+        """
+        
+        if indicator=='do2':
+            '''
+            NII,Ha
+            '''
+            lines=np.array([6548.03, 6583.41,6562.80])
+            dv=np.full_like(lines,800)
+            c = 299792.458
+            flag = False
+            snr_emi=[]
+            for line, dvj in zip(lines, dv):
+                flag = (wave > line*(1 + z)*(1 - dvj/(c))) \
+                    & (wave < line*(1 + z)*(1 + dvj/(c)))
+                f_emi=self.flux_stack[flag]
+                err_emi=self.error_stack[flag]
+                snr_emi.append(np.sum(f_emi)/np.sqrt(np.sum(err_emi)))
+            if np.min(snr_emi)>5:
+                print(self.plateifu,file=open(self.dir+'do2_min_snr_emi_5.txt','a+'))
+                                                      
+        elif indicator=='kd02':
+            '''
+            OII,OIII,NII,Hb
+            '''
+            lines=np.array([3726.03, 3728.82, 4861.33, 4958.92, 5006.84, 6548.03, 6583.41])
+            dv=np.full_like(lines,800) # 800 width
+            c = 299792.458
+            flag = False
+            snr_emi=[]
+            for line, dvj in zip(lines, dv):
+                flag = (wave > line*(1 + z)*(1 - dvj/(c))) \
+                    & (wave < line*(1 + z)*(1 + dvj/(c)))
+                f_emi=self.flux_stack[flag]
+                err_emi=self.error_stack[flag]
+                snr_emi.append(np.sum(f_emi)/np.sqrt(np.sum(err_emi)))
+            if np.min(snr_emi)>5:
+                print(self.plateifu,file=open(self.dir+'kd02_min_snr_emi_5.txt','a+'))
+            
