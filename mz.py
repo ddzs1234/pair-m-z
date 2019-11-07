@@ -51,7 +51,7 @@ def ratio(pair):
     """
     mask_p = (abs(pair[:,8]) < abs(pair[:,10]))
     # the first bin:
-    mask1 = (pair[:,10] < 0.2)
+    mask1 = (pair[:,10] < 0.1)
     mask1_1p = mask1 & mask_p
     if pair[:,10][mask1].size==0:
         ratio1_p=sigma1_p=0
@@ -62,7 +62,7 @@ def ratio(pair):
         ratio1_p_s=str(pair[:,10][mask1_1p].size)+'/'+str(pair[:,10][mask1].size)
 
     # the second bin:
-    mask2 = (pair[:,10] >= 0.2) & (pair[:,10] <= 0.4)
+    mask2 = (pair[:,10] >= 0.1) & (pair[:,10] <= 0.2)
     mask2_1p = mask2 & mask_p
     if pair[:,10][mask2].size==0:
         ratio2_p=sigma2_p=0
@@ -73,7 +73,7 @@ def ratio(pair):
         ratio2_p_s=str(pair[:,10][mask2_1p].size)+'/'+str(pair[:,10][mask2].size)
 
     # the third bin:
-    mask3 = (pair[:,10] > 0.4)
+    mask3 = (pair[:,10] > 0.2)
     mask3_1p = mask3 & mask_p
     if pair[:,10][mask3].size==0:
         ratio3_p=sigma3_p=0
