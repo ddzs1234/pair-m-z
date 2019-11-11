@@ -96,6 +96,7 @@ class mzr(object):
                  z,
                  z_e,
                  indicator_name,
+                 region,
                  mass,
                  mass_name,
                  dis,
@@ -111,6 +112,7 @@ class mzr(object):
         self.z = z.astype(np.float)
         self.z_e = z_e.astype(np.float)
         self.indicator_name = indicator_name
+        self.region=region
         self.mass = mass.astype(np.float)
         self.mass_name = mass_name
         self.dir1 = dir1
@@ -149,8 +151,8 @@ class mzr(object):
         names = ['plateifu', 'mass', 'z', 'z_e']
         if self.save:
             t = Table([ifu_noeff, mass_noeff, z_noeff, z_e_noeff], names=names)
-            t.write(self.dir1 + '%s_strange_%s.fits' %
-                    (self.indicator_name, self.mass_name))
+            t.write(self.dir1 + '%s_strange_%s_%s.fits' %
+                    (self.indicator_name, self.mass_name,self.region))
 
     def remove_nouse_data(self):
         """
@@ -175,7 +177,7 @@ class mzr(object):
             len(a_ifu[mask1]) == length, "miss some point"
         if self.save:
             t=Table([a_ifu[mask1],a_mass[mask1],a_z[mask1]],names=['plateifu','mass','z'])
-            t.write(self.dir1+'remove_%s_%s.fits'%(self.indicator_name,self.mass_name))
+            t.write(self.dir1+'remove_%s_%s_%s.fits'%(self.indicator_name,self.mass_name,self.region))
 
     def MZR(self):
         """
@@ -201,13 +203,13 @@ class mzr(object):
             plt.errorbar(self.binx, self.median_z, yerr=self.std_z, fmt='rp--')
             plt.xlabel('$Log(M/M_{\odot})$')
             plt.ylabel('$12+log(O/H)$')
-            plt.xlim(8.0,1.02*np.max(self.mass))
-            plt.ylim(7.9,9.8)
-            plt.title('%s_%s : 1-1.5re' %
-                      (self.indicator_name, self.mass_name))
+            plt.xlim(0.99*np.min(self.mass),1.02*np.max(self.mass))
+            plt.ylim(8.0,9.6)
+            plt.title('%s_%s : %s' %
+                      (self.indicator_name, self.mass_name,self.region))
             if self.save:
-                plt.savefig(self.dir1 + '%s_%s_mzr.jpg' %
-                            (self.indicator_name, self.mass_name),
+                plt.savefig(self.dir1 + '%s_%s_mzr_%s.jpg' %
+                            (self.indicator_name, self.mass_name,self.region),
                             dpi=300)
             else:
                 plt.show()
@@ -292,7 +294,7 @@ class mzr(object):
                           'SEC_Z_E', 'PRI_IFU', 'SEC_IFU', 'DELTA_Z',
                           'DELTA_Z_E', 'DELTA_Z_MZR', 'DELTA_Z_E_MZR'
                       ])
-            t.write(self.dir1 + 'pair_{0}_{1}_{2}.txt'.format(self.indicator_name,self.dis,self.dvel),format='ascii')
+            t.write(self.dir1 + 'pair_{0}_{1}_{2}_{3}.txt'.format(self.indicator_name,self.dis,self.dvel,self.region),format='ascii')
 
     def group(self):
         """
@@ -352,8 +354,8 @@ class mzr(object):
             plt.title('stellar mass distribution')
             if save:
                 plt.savefig(self.dir1 +
-                            '%s_%s_%s_stellar_mass_distribution.jpg' %
-                            (self.indicator_name, self.dis, self.dvel),
+                            '%s_%s_%s_%s_stellar_mass_distribution.jpg' %
+                            (self.indicator_name, self.dis, self.dvel,self.region),
                             dpi=300)
 
             # to do SFR
@@ -432,8 +434,8 @@ class mzr(object):
                       'DELTA_Z', 'DELTA_Z_E', 'DELTA_Z_MZR',
                       'DELTA_Z_E_MZR'
                   ])
-        t1.write(self.dir1 + '%s_%s_%s_random_random.txt' %
-                (self.indicator_name, self.dis, self.dvel),format='ascii')
+        t1.write(self.dir1 + '%s_%s_%s_%s_random_random.txt' %
+                (self.indicator_name, self.dis, self.dvel,self.region),format='ascii')
         
 
 
@@ -565,8 +567,8 @@ class mzr(object):
                         va='bottom')
         autolabel2(rect1, "left")
         autolabel(rect2, "right")
-        plt.savefig(self.dir1 + 'ratio_%s_%s_%s_%s_p.jpg' %
-                    (self.indicator_name,self.time,self.dis,self.dvel),
+        plt.savefig(self.dir1 + 'ratio_%s_%s_%s_%s_p_%s.jpg' %
+                    (self.indicator_name,self.time,self.dis,self.dvel,self.region),
                     dpi=300)
         plt.show()
         plt.clf()
