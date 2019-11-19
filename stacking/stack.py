@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np 
 from astropy.table import Table
 from scipy.interpolate import interp1d
+from matplotlib.pyplot import cm
 np.seterr(divide='ignore', invalid='ignore')
 
 class stack(object):
@@ -10,8 +11,9 @@ class stack(object):
     stacking 0-1re
     S/N>5 sigma
     mask (5570-5590A)
+    plot: wavelength_flux,imshow,bpt
     """
-    def __init__(self,plateifu,wave,flux,ivar,flux_map,ivar_map,mask,ellcoo,v,dirres,zifu,plot=False):
+    def __init__(self,plateifu,wave,flux,ivar,flux_map,ivar_map,mask,ellcoo,v,dirres,zifu,plot=True):
         self.plateifu=plateifu
         self.flux = flux
         self.wave = wave
@@ -28,15 +30,21 @@ class stack(object):
         count
         """
         self.pre=self.remove_agn_badspx_ellcoo()
-        with open(self.dir+'not_valid.txt','a+') as f1:
-            if self.pre<=0.3:
-                print(self.plateifu,file=f1)
-                self.vel2z()
-                self.stack()
-                self.min_snr_emission_do2()
-                self.min_snr_emission_kd02()
-                if plot:
-                    self.plot() 
+        self.vel2z()
+        self.stack()
+        self.plot()
+        self.min_snr_emission_do2()
+        self.min_snr_emission_kd02()
+        with open(self.dir+'large_than_0p_3.txt','a+') as f_vaild,\
+                open(self.dir+'less_than_0p_3.txt','a+') as f_novalid:
+            if self.pre>0.3:
+                print(self.plateifu,file=f_vaild)
+            else:
+                print(self.plateifu,file=f_novalid)
+            
+            
+#             if plot:
+             
 
         
     def remove_agn_badspx_ellcoo(self):
@@ -49,59 +57,37 @@ class stack(object):
         
         """
         BPT diagram remove AGN
-        Kauffmann 2003: log(OIII/hb)>0.61/(log(NII/Ha)-0.05)+1.13
+        Kauffmann 2003: log(OIII/hb)>0.61/(log(NII/Ha)-0.05)+1.3
         [oiii]5008,4960:13,12(5007)
         Hb4862:11
         NII6549,6585:17,19(6584)
         Ha6564:18
         """        
-        x=np.log10(self.flux_map[19]/self.flux_map[18])
-        y=np.log10(self.flux_map[13]/self.flux_map[11])
-        mask_bpt=(y<=0.61/(x-0.05)+1.13)&(x<0.05)
-        mask_bpt_valid=(y>0.61/(x-0.05)+1.13)
-        #mask in agn is not same with sf
-        #f=np.ma.array(f,mask=mask)
-        
-        """
-        ellcoo
-        """
+        self.x=np.log10(self.flux_map[19]/self.flux_map[18])
+        self.y=np.log10(self.flux_map[13]/self.flux_map[11])
+        self.mask_sf=(self.y<0.61/(self.x-0.05)+1.3)&(self.x<0.05)&(self.y<(0.61/(self.x-0.47)+1.19))
+        self.mask_agn=(1-self.mask_sf).astype(np.bool)
+
+        self.mask_1=(self.ellcoo<=1)
+        num_all=np.sum(self.mask_1)
+        self.mask_2=self.mask_1&(self.mask_sf)
+        num_valid=np.sum(self.mask_2)
+        self.mask_3=self.mask_1&(self.mask_agn)
         
         """
         count effective points
         """
-        mask_1=(self.ellcoo<=1)
-        plt.figure()
-        plt.subplot(1,2,1)
-#         plt.imshow(mask_1) 
-        num_all=np.sum(mask_1)
-        mask_2=(self.ellcoo<=1)&(mask_bpt)
-        plt.imshow(mask_2)
-        num_valid=np.sum(mask_2)
-        mask_3=mask_1&(mask_bpt_valid)
-#         plt.savefig(self.dir+'%s_1re_stack_imshow.jpg'%self.plateifu,format='jpg')
-#         plt.imshow(mask_3)
         pre=num_valid/num_all
-#         print("percentage of vaild points : %s / %s"%(num_valid,num_all))
-#         print("percentage of vaild points : ",num_valid/num_all)
+
         """
         drp logcube
         """
-#         print(self.flux.shape)
-        self.flux=self.flux[mask_2]
-        self.v=self.v[mask_2]
-        self.ivar=self.ivar[mask_2]
+        self.flux=self.flux[self.mask_2]
+        self.v=self.v[self.mask_2]
+        self.ivar=self.ivar[self.mask_2]
         
         return pre
                 
-    def sf(self):
-        """
-        Pick out SF region:
-        """
-        x=np.log10(self.flux_map[19]/self.flux_map[18])
-        y=np.log10(self.flux_map[13]/self.flux_map[11])
-        mask=(y<0.61/(x-0.05)+1.13)
-        # f=f[mask]
-        return mask
         
     
     def vel2z(self):
@@ -122,10 +108,7 @@ class stack(object):
             """
             5570-5590A
             """
-#             mask_sky=(self.wave>5500)&(self.wave<6000)
-#             flux1=np.ma.array(flux,mask=mask_sky)
-#             ivar1=np.ma.array(ivar,mask=mask_sky)
-#             wave_rest=np.ma.array(wave_rest,mask=mask_sky)
+
             mask_sky=(self.wave<5570)|(self.wave>5590)
             flux1=np.array(flux[mask_sky])
             ivar1=np.array(ivar[mask_sky])
@@ -150,22 +133,55 @@ class stack(object):
         table.append(self.error_stack)
         table=np.transpose(table)
         t=Table(table,names=['wave','flux','error'])
-        if snr>5:            
-            print('plateifu',self.plateifu)
-            t.write(self.dir+'%s_1re_stack.fits'%self.plateifu,format='fits')
-        else:      
-            t.write(self.dir+'%s_1re_stack_snr_less5.fits'%self.plateifu,format='fits')
-            print('snr<5',self.plateifu)
+        t.write(self.dir+'%s_1re_stack.fits'%self.plateifu,format='fits')
+        with open(self.dir+'snr_large_than_5.txt','a+') as f_snr5, open(self.dir+'snr_small_than_5.txt','a+') as f_snrless_5:
+            if snr>5:            
+                print(self.plateifu,file=f_snr5)
+            else:      
+                print(self.plateifu,file=f_snrless_5)
             
     def plot(self):
         """
         plot (wave,flux)
         """
         
-        plt.subplot(1,2,2)
-        plt.plot(self.wave,self.flux_stack)
+        plt.figure(figsize=(20,20))
+        ax1=plt.subplot(211) # spectrum
+        ax2=plt.subplot(245) # imshow
+        ax3=plt.subplot(246) # bpt
+        ax4=plt.subplot(247)
+        ax5=plt.subplot(248)
+        
+        ax2.imshow(self.mask_1,cmap=cm.Blues) 
+        ax2.set_title('region')
+        ax3.imshow(self.mask_2,cmap=cm.Oranges)   
+        ax3.set_title('sf region')
+        ax4.imshow(self.mask_3,cmap=cm.Greys)
+        ax4.set_title('no-sf region')
+
+        x_bpt = np.arange(np.min(self.x)-0.01, 0.07, 0.02)
+        y_bpt = 0.61/(x_bpt-0.47)+1.19
+        x_bpt1 = np.arange(np.min(self.x)-0.01, -0.3, 0.02)
+        y_bpt1 = 0.61/(x_bpt1-0.05)+1.3
+        ax5.plot(x_bpt,y_bpt,'r')
+        ax5.plot(x_bpt1,y_bpt1,'k')
+        x_sf = self.x[self.mask_2]
+        y_sf = self.y[self.mask_2]
+        
+#         t=Table([self.x[self.mask_1],self.y[self.mask_1]],names=['x','y'])
+#         t.write(self.dir+'s_x_y.fits',format='fits')
+        ax5.scatter(self.x[self.mask_1], self.y[self.mask_1], color='dodgerblue', s=2,label='0-1re')
+        ax5.scatter(x_sf, y_sf, color='orange', s=2,label='0-1re sf')
+#         ax5.axvline(x=-0.05,label='x=-0.05')
+        ax5.legend()
+        ax5.set_xlabel('log(NII/Ha)')
+        ax5.set_ylabel('log([OIII]/Hb)')
+        ax5.set_title(self.plateifu)
+        ax1.plot(self.wave,self.flux_stack)
         plt.savefig(self.dir+'%s_1re_stack.jpg'%self.plateifu,format='jpg')
 #         plt.show()
+        plt.close()
+
            
     def min_snr_emission_do2(self):
         """
@@ -181,14 +197,13 @@ class stack(object):
         flag = False
         snr_emi=[]
         for line, dvj in zip(lines, dv):
-            print(self.wave.shape,self.flux_stack.shape,self.z,dvj)
             flag = (self.wave > line*(1 + self.zifu)*(1 - dvj/(c))) \
                 & (self.wave < line*(1 + self.zifu)*(1 + dvj/(c)))
             f_emi=self.flux_stack[flag]
             err_emi=self.error_stack[flag]
             snr_emi.append(np.sum(f_emi)/np.sqrt(np.sum(err_emi)))
         if np.min(snr_emi)>5:
-            with open(self.dir+'do2_min_snr_emi_5.txt','a+') as f_do2_output:
+            with open(self.dir+'do2_min_snr_emi_large5.txt','a+') as f_do2_output:
                 print(self.plateifu,file=f_do2_output)
                      
     def min_snr_emission_kd02(self):
@@ -207,6 +222,6 @@ class stack(object):
             err_emi=self.error_stack[flag]
             snr_emi.append(np.sum(f_emi)/np.sqrt(np.sum(err_emi)))
         if np.min(snr_emi)>5:
-            with open(self.dir+'kd02_min_snr_emi_5.txt','a+') as f_kd02_output:
+            with open(self.dir+'kd02_min_snr_emi_large5.txt','a+') as f_kd02_output:
                 print(self.plateifu,file=f_kd02_output)
             
