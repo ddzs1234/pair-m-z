@@ -6,14 +6,15 @@ from scipy.interpolate import interp1d
 from matplotlib.pyplot import cm
 np.seterr(divide='ignore', invalid='ignore')
 
+
 class stack(object):
     """
-    stacking 0-1re
+    stacking 0-1re'1-1.5re
     S/N>5 sigma
     mask (5570-5590A)
     plot: wavelength_flux,imshow,bpt
     """
-    def __init__(self,plateifu,wave,flux,ivar,flux_map,ivar_map,mask,ellcoo,v,dirres,zifu,plot=True):
+    def __init__(self,plateifu,flux_header,wave,flux,ivar,flux_map,ivar_map,mask,ellcoo,v,dirres,zifu,region,plot=True):
         self.plateifu=plateifu
         self.flux = flux
         self.wave = wave
@@ -25,11 +26,18 @@ class stack(object):
         self.v=v
         self.dir=dirres
         self.zifu=zifu
+        self.region=region
+        self.flux_header=flux_header
         
         """
         count
         """
-        self.pre=self.remove_agn_badspx_ellcoo()
+        self.remove_badspx()
+        if self.region=="arcsec":
+            self.pick_arcsec()
+        elif self.region=='re':
+            self.pick_ellcoo()
+        self.pre=self.remove_agn()
         self.vel2z()
         self.stack()
         self.plot()
@@ -42,18 +50,32 @@ class stack(object):
             else:
                 print(self.plateifu,file=f_novalid)
             
-            
-#             if plot:
-             
-
         
-    def remove_agn_badspx_ellcoo(self):
+    def remove_badspx(self):
         """
         remove bad spaxel in map data
         """
         mask_bad=(self.mask!=0) # !=0 remove
         self.flux_map=np.ma.array(self.flux_map,mask=mask_bad)
         self.ivar_map=np.ma.array(self.ivar_map,mask=mask_bad)
+        
+    def pick_arcsec(self):
+        self.x_center = np.int(self.flux_header['CRPIX1']) - 1
+        self.y_center = np.int(self.flux_header['CRPIX2']) - 1
+        dx = self.flux_header['CD1_1'] * 3600.  # deg to arcsec
+        dy = self.flux_header['CD2_2'] * 3600.  # deg to arcsec
+        x_extent = (np.array([0., self.flux_map[1].shape[0]]) - (self.flux_map[1].shape[0] - self.x_center)) * dx * (-1)
+        y_extent = (np.array([0., self.flux_map[1].shape[1]]) - (self.flux_map[1].shape[1] - self.y_center)) * dy
+        self.extent = [x_extent[0], x_extent[1], y_extent[0], y_extent[1]]
+        print(self.extent)
+        
+        self.mask_1=(self.extent<=3)&(self.extent>=-3)
+        
+        
+    def pick_ellcoo(self):
+        self.mask_1=(self.ellcoo<=1.5)&(self.ellcoo>1)
+        
+    def remove_agn(self):
         
         """
         BPT diagram remove AGN
@@ -68,7 +90,6 @@ class stack(object):
         self.mask_sf=(self.y<0.61/(self.x-0.05)+1.3)&(self.x<0.05)&(self.y<(0.61/(self.x-0.47)+1.19))
         self.mask_agn=(1-self.mask_sf).astype(np.bool)
 
-        self.mask_1=(self.ellcoo<=1)
         num_all=np.sum(self.mask_1)
         self.mask_2=self.mask_1&(self.mask_sf)
         num_valid=np.sum(self.mask_2)
@@ -133,7 +154,7 @@ class stack(object):
         table.append(self.error_stack)
         table=np.transpose(table)
         t=Table(table,names=['wave','flux','error'])
-        t.write(self.dir+'%s_1re_stack.fits'%self.plateifu,format='fits')
+        t.write(self.dir+'%s_1-1p5_re_stack.fits'%self.plateifu,format='fits')
         with open(self.dir+'snr_large_than_5.txt','a+') as f_snr5, open(self.dir+'snr_small_than_5.txt','a+') as f_snrless_5:
             if snr>5:            
                 print(self.plateifu,file=f_snr5)
@@ -170,7 +191,7 @@ class stack(object):
         
 #         t=Table([self.x[self.mask_1],self.y[self.mask_1]],names=['x','y'])
 #         t.write(self.dir+'s_x_y.fits',format='fits')
-        ax5.scatter(self.x[self.mask_1], self.y[self.mask_1], color='dodgerblue', s=2,label='0-1re')
+        ax5.scatter(self.x[self.mask_1], self.y[self.mask_1], color='dodgerblue', s=2,label='1-1.5re')
         ax5.scatter(x_sf, y_sf, color='orange', s=2,label='0-1re sf')
 #         ax5.axvline(x=-0.05,label='x=-0.05')
         ax5.legend()
@@ -178,7 +199,7 @@ class stack(object):
         ax5.set_ylabel('log([OIII]/Hb)')
         ax5.set_title(self.plateifu)
         ax1.plot(self.wave,self.flux_stack)
-        plt.savefig(self.dir+'%s_1re_stack.jpg'%self.plateifu,format='jpg')
+        plt.savefig(self.dir+'%s_1_1p5_re_stack.jpg'%self.plateifu,format='jpg')
 #         plt.show()
         plt.close()
 
