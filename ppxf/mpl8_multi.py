@@ -12,12 +12,8 @@ wave not rest frame
 '''
 
 import glob
-import time
-from multiprocessing.dummy import Pool as ThreadPool
-from os import mkdir, path
-from time import localtime
+from os import path,mkdir
 from time import perf_counter as clock
-from time import strftime as now
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -27,7 +23,6 @@ import ppxf as ppxf_package
 import ppxf.miles_util as lib
 import ppxf.ppxf_util as util
 import ppxf.ppxfgas as gas
-import ppxf.ppxfmpl8 as mpl8
 import ppxf.ppxfstellar as stellar
 from ppxf.ppxf import ppxf
 
@@ -43,7 +38,7 @@ def ppxf_example_kinematics_sdss(dirfile, galaxy, lam_gal, plateifu, mask,
 
     c = 299792.458
     frac = lam_gal[1] / lam_gal[0]
-    dlamgal = (frac - 1) * lam_gal
+    
     a = np.full((1, 4563), 2.76)
     fwhm_gal = a[0][mask]
 
@@ -77,7 +72,6 @@ def ppxf_example_kinematics_sdss(dirfile, galaxy, lam_gal, plateifu, mask,
 
     vel = c * np.log(1 + z)  # eq.(8) of Cappellari (2017)
     start = [vel, 200.]  # (km/s), starting guess for [V, sigma]
-    t = clock()
 
     pp = stellar.ppxf(dirfile,
                       templates,
@@ -85,6 +79,7 @@ def ppxf_example_kinematics_sdss(dirfile, galaxy, lam_gal, plateifu, mask,
                       noise,
                       velscale,
                       start,
+                      z,
                       goodpixels=goodpixels,
                       plot=True,
                       moments=4,
@@ -163,7 +158,8 @@ def emission(dirfile, w1, f1, redshift, plateifu, tie_balmer, limit_doublets):
                   noise,
                   velscale,
                   start,
-                  plot=False,
+                  z,
+                  plot=True,
                   moments=moments,
                   degree=-1,
                   mdegree=10,
@@ -175,8 +171,6 @@ def emission(dirfile, w1, f1, redshift, plateifu, tie_balmer, limit_doublets):
                   gas_names=gas_names,
                   gas_reddening=gas_reddening)
 
-    plt.figure()
-    plt.clf()
     pp.plot()
     return pp.bestfit, pp.lam
 
@@ -208,95 +202,96 @@ def move_continuum(wave, z, width=800):
     return flag
 
 
-def fitting(filenames):
+def fitting(filenames,plateifu,snr):
+    
+    
+    dir2 = '/media/ashley/project/pair_galaxy/2020-1-31/bpt/diff_snr/'
 
-    zfile = fits.open(
-        '/Users/astro/Documents/notebooks/manga/spectro/redux/v2_5_3/drpall-v2_5_3.fits'
-    )
-    dir2 = '/Users/astro/Documents/notebooks/zs/2019-10-18/1.0re/'
 
-    with open(dir2 + 'index_error.txt', 'a+') as f_indexerror:
-        with open(dir2 + 'output.txt', 'a+') as f_output:
-
-            length1 = len(
-                '/Users/astro/Documents/notebooks/zs/2019-10-18/stacking/')
-            length2 = len('_1re_stack.fits')
-            plateifu = filenames[length1:-length2]
-            dirfile = dir2 + plateifu + '.txt'
-            print('    start:    %s    ' % plateifu, file=f_output)
-
+    with fits.open('/media/ashley/project/mangawork/manga/spectro/redux/v2_5_3/drpall-v2_5_3.fits') as zfile:
+        
+        if not path.exists(dir2 +plateifu+'_%s/'%snr) and path.exists(filenames):
+            mkdir(dir2+plateifu+'_%s/'%snr)
+            dirfile = dir2 +plateifu+'_%s/'%snr+plateifu + '.txt'
+            
             data = zfile[1].data
             pifu = data.field('plateifu')
             z_info = data.field('z')
             index_z = np.where(pifu == plateifu)[0]
             z1 = z_info[index_z]
-
+        
             file = fits.open(filenames)
             t = file[1].data
-            mask1 = (t['wave'] / (1 + z1) > 3540) & (t['wave'] /
-                                                     (1 + z1) < 7409)
-
-            flux = t['flux'][mask1]
-            galaxy = flux / np.median(flux)
-            wave = t['wave'][mask1]
-            noise = t['error'][mask1]
-            f1 = galaxy
-            w1 = wave
-            try:
-                f2, w2 = ppxf_example_kinematics_sdss(dirfile, galaxy, wave,
-                                                      plateifu, mask1, noise,
-                                                      z1)
-                print('    finish continuum    ', file=f_output)
-                """
-                先看看信噪比》5：
-                """
-                mask_em = move_continuum(w1, z1)
-                flux_mask = (f1 - f2)[mask_em]
-                w1_mask = w1[mask_em]
-                noise_mask = noise[mask_em]
-                snr_em = np.sum(flux_mask) / np.sqrt(np.sum(noise_mask**2))
-
-                plt.figure()
-                plt.plot(w1_mask,
-                         flux_mask,
-                         label='emission line mask %s' % snr_em)
-                plt.legend()
-                plt.savefig(dirfile[:-4] + 'snr_em.jpg', dpi=300)
-                plt.axis('off')
-                plt.close()
-                if snr_em > 5:
-                    ff, ww = emission(dirfile,
-                                      w1,
-                                      f1 - f2,
-                                      z1,
-                                      plateifu,
-                                      tie_balmer=True,
-                                      limit_doublets=False)
-
-                    plt.figure()
-                    plt.plot(ww, ff, label='fitting')
-                    plt.plot(ww, galaxy - f2, ":", label='stacking')
-                    plt.title(plateifu)
-                    plt.legend()
-                    plt.savefig(dirfile[:-4] + '_show.jpg', dpi=300)
-                    plt.axis('off')
-                    plt.close()
-                    print('    finish fit %s    ' % plateifu, file=f_output)
-                else:
-                    with open('snr<5.txt', 'a+') as f_snr:
-                        print('snr<5', plateifu, file=f_snr)
-            except IndexError:
-                print(plateifu, file=f_indexerror)
-                pass
+            if z1.size>0:
+                print(plateifu,z1)
+                mask1 = (t['wave'] / (1 + z1) > 3540) & (t['wave'] /
+                                                         (1 + z1) < 7409)
+                
+                flux = t['flux'][mask1]
+                if np.median(flux) >0:
+                    print(np.median(flux))
+                    galaxy = flux / np.median(flux)
+                    wave = t['wave'][mask1]
+                    noise = t['flux_error'][mask1]
+                    f1 = galaxy
+                    w1 = wave
+                    try:
+                        f2, w2 = ppxf_example_kinematics_sdss(dirfile, galaxy, wave,
+                                                              plateifu, mask1, noise,
+                                                              z1)
+                
+                        """
+                        先看看信噪比》5：
+                        """
+                        mask_em = move_continuum(w1, z1)
+                        flux_mask = (f1 - f2)[mask_em]
+                        w1_mask = w1[mask_em]
+                        noise_mask = noise[mask_em]
+                        snr_em = np.sum(flux_mask) / np.sqrt(np.sum(noise_mask**2))
+                
+                        plt.figure()
+                        plt.plot(w1_mask,
+                                  flux_mask,
+                                  label='emission line mask %s' % snr_em)
+                        plt.legend()
+                        plt.savefig(dirfile[:-4] + 'snr_em.jpg', dpi=300)
+                        plt.axis('off')
+                        plt.clf()
+                        if snr_em > 5:
+                            ff, ww = emission(dirfile,
+                                              w1,
+                                              f1 - f2,
+                                              z1,
+                                              plateifu,
+                                              tie_balmer=False,
+                                              limit_doublets=False)
+                
+                            plt.figure()
+                            plt.plot(ww, ff, label='fitting')
+                            plt.plot(ww, galaxy - f2, ":", label='stacking')
+                            plt.title(plateifu)
+                            plt.legend()
+                            plt.savefig(dirfile[:-4] + '_show.jpg', dpi=300)
+                            plt.axis('off')
+                            plt.clf()
+                
+                        else:
+                            with open('snr<5.txt', 'a+') as f_snr:
+                                print('snr<5', plateifu, file=f_snr)
+                    except IndexError:
+                        print('index_error',plateifu)
+                        pass
             file.close()
 
-    zfile.close()
+
 
 
 if __name__ == '__main__':
-    dirstack = '/Users/astro/Documents/notebooks/zs/2019-10-18/stacking/'
-    filenames = glob.glob(dirstack + '*.fits')
-    pool = ThreadPool(processes=6)
-    pool.map(fitting, filenames)
-    pool.close()
-    pool.join()
+    dirstack = '/media/ashley/project/pair_galaxy/2020-1-31/bpt/snr_stellar_velocity_fitting/'
+    filenames = glob.glob(dirstack+'*.fits')
+    print(filenames)
+    for i in filenames:
+        fitting(i)
+        
+
+    
